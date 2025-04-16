@@ -1,5 +1,5 @@
 import streamlit as st
 
-st.title('🎈 App Name')
+st.title('✍️ GradeScope')
 
-st.write('Hello world!')
+st.info('This app calculates your pre-final grade')
