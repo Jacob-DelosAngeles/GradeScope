@@ -24,21 +24,30 @@ router.post('/calculate', async (req, res) => {
         const isExempt = preFinalGrade >= 77 && noLongExamBelow60;
 
         let requiredFinalExamScore = null;
-        const targetFinalGrade = 75; // Passing Grade
+        const targetFinalGrade = 60; // Passing Grade (Updated from 75)
 
         if (!isExempt) {
             // Final Grade = (Pre-Final * 0.70) + (Final Exam * 0.30)
-            // 75 = (Pre-Final * 0.70) + (Final Exam * 0.30)
-            // (75 - (Pre-Final * 0.70)) / 0.30 = Final Exam
+            // 60 = (Pre-Final * 0.70) + (Final Exam * 0.30)
+            // (60 - (Pre-Final * 0.70)) / 0.30 = Final Exam
             requiredFinalExamScore = (targetFinalGrade - (preFinalGrade * 0.70)) / 0.30;
-
-            // If the result is negative or they already passed virtually (e.g. prefinal is very high but they failed a condition?), 
-            // technically formula applies. But if prefinal is e.g. 90 but 1 exam < 60, isExempt is false.
-            // Then required score might be low. We just return the calculated value.
         }
 
-        // Save to DB (Optional based on requirements, but user asked for Schema so implication is to save or just use structure)
-        // We will save it for "Calculation MongoDB schema" requirement context.
+        // Response Data Object
+        const responseData = {
+            preFinalGrade: parseFloat(preFinalGrade.toFixed(2)),
+            isExempt,
+            requiredFinalExamScore: requiredFinalExamScore !== null ? parseFloat(requiredFinalExamScore.toFixed(2)) : null,
+            breakdown: {
+                exercises: exercises,
+                longExamsAvg: parseFloat(longExamsAvg.toFixed(2)),
+                quizzes: quizzes,
+                project: project
+            }
+        };
+
+        // Save to DB (Non-blocking)
+        // We do not await this, so the user gets a response immediately.
         const calculation = new Calculation({
             exercises,
             longExams,
@@ -49,26 +58,18 @@ router.post('/calculate', async (req, res) => {
             requiredFinalExamScore
         });
 
-        await calculation.save();
+        calculation.save().catch(dbErr => {
+            console.error("Background Database save failed:", dbErr.message);
+        });
 
         res.json({
             success: true,
-            data: {
-                preFinalGrade: parseFloat(preFinalGrade.toFixed(2)),
-                isExempt,
-                requiredFinalExamScore: requiredFinalExamScore !== null ? parseFloat(requiredFinalExamScore.toFixed(2)) : null,
-                breakdown: {
-                    exercises: exercises,
-                    longExamsAvg: parseFloat(longExamsAvg.toFixed(2)),
-                    quizzes: quizzes,
-                    project: project
-                }
-            }
+            data: responseData
         });
 
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Server error' });
+        console.error("Calculation Error:", err);
+        res.status(500).json({ error: err.message || 'Server error' });
     }
 });
 

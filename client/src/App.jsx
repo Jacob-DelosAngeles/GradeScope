@@ -160,7 +160,7 @@ function App() {
               <div className="mt-4 p-4 bg-yellow-50 rounded text-yellow-800">
                 <p className="font-semibold">Required Final Exam Score:</p>
                 <p className="text-3xl font-bold">{result.requiredFinalExamScore}</p>
-                <p className="text-sm mt-1">to achieve a Final Grade of 75.</p>
+                <p className="text-sm mt-1">to achieve a Final Grade of 60.</p>
               </div>
             )}
             {result.isExempt && (
