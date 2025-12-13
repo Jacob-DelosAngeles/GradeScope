@@ -66,7 +66,38 @@ The frontend is a React application built with Vite.
    - **Green**: You are Exempt!
    - **Yellow**: You are NOT Exempt. The app will show the score you need on the Final Exam.
 
+## 5. MVP Features (Beta)
+
+The application now includes features to gather user demand:
+
+1.  **Feedback**: Click the "Give us an honest review" button to submit feedback.
+2.  **Email Subscription**: Enter an email in the "Stay Updated" form to subscribe.
+
+## 6. Accessing Data (Emails & Feedback)
+
+All data is stored in your local MongoDB database. To view it:
+
+1.  Open a new terminal.
+2.  Start the MongoDB Shell:
+    ```bash
+    mongosh
+    ```
+3.  Switch to the database:
+    ```bash
+    use gradescoped
+    ```
+4.  View Feedback:
+    ```javascript
+    db.feedbacks.find()
+    ```
+5.  View Subscribers:
+    ```javascript
+    db.subscribers.find()
+    ```
+
 ## Troubleshooting
 
-- **MongoDB Error**: Ensure your local MongoDB service is running (`sudo service mongod start` on Linux/WSL).
-- **Connection Refused**: Make sure the backend is running on port 5000 and the frontend is pointing to `http://localhost:5000` (configured in `App.jsx`).
+-   **MongoDB Error**: Ensure your local MongoDB service is running.
+    -   **WSL/Linux**: `sudo service mongod start`
+    -   **Windows**: Open Services app and start "MongoDB Server".
+-   **Connection Refused**: Make sure the backend is running on port 5000 and the frontend is pointing to `http://localhost:5000` (configured in `App.jsx`).
