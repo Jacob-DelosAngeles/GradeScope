@@ -48,14 +48,32 @@ router.post('/calculate', async (req, res) => {
 
         // 4. Exemption Logic (Updated)
         // Exempt if Pre-Final >= 77 AND No Component Average < 60
+        // NOTE: If using custom formula, this specific "77" logic might need adjustment, 
+        // but let's keep it as a "Bonus Exemption" rule for now unless user asks to change it.
         const isExempt = preFinalGrade >= 77 && !hasFailingComponent;
 
         let requiredFinalExamScore = null;
-        const targetFinalGrade = 60;
+
+        // --- Settings Parsing ---
+        const { settings } = req.body;
+        // Default to Standard System: 70% Pre-Final / 60 Passing
+        const preFinalWeightPct = settings && settings.preFinalWeight ? parseFloat(settings.preFinalWeight) : 70;
+        const passingGrade = settings && settings.passingGrade ? parseFloat(settings.passingGrade) : 60;
+
+        const preFinalWeightDec = preFinalWeightPct / 100;
+        const examWeightDec = 1 - preFinalWeightDec;
+
+        // Formula: PassingGrade = (PreFinal * Weight) + (Exam * ExamWeight)
+        // Exam = (PassingGrade - (PreFinal * Weight)) / ExamWeight
 
         if (!isExempt) {
-            // Formula: 60 = (Pre-Final * 0.70) + (Final Exam * 0.30)
-            requiredFinalExamScore = (targetFinalGrade - (preFinalGrade * 0.70)) / 0.30;
+            if (examWeightDec <= 0.01) {
+                // If Pre-Final is 100% of the grade, there is no "Required Final Exam"
+                // The "Required Final Exam Score" is effectively N/A or 0.
+                requiredFinalExamScore = 0;
+            } else {
+                requiredFinalExamScore = (passingGrade - (preFinalGrade * preFinalWeightDec)) / examWeightDec;
+            }
         }
 
         const responseData = {
