@@ -68,42 +68,14 @@ function App() {
 
   // --- Calculation ---
 
-  const calculate = async () => {
-    setError(null);
-    setResult(null);
 
-    // 1. Validate Weights Sum to 100
-    const totalWeight = components.reduce((sum, c) => sum + parseFloat(c.weight || 0), 0);
-    if (Math.abs(totalWeight - 100) > 0.1) {
-      setError(`Weights must sum to exactly 100%. Current total: ${totalWeight}%`);
-      return;
-    }
 
-    // 2. Validate Scores (at least one valid number per component? strict or loose?)
-    // Let's filter out empty scores before sending, but ensure structure is valid
-    const cleanComponents = components.map(c => ({
-      name: c.name,
-      weight: parseFloat(c.weight), // Ensure number
-      scores: c.scores
-    }));
-
-    try {
-      const response = await fetch(`${API_URL}/api/calculate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ components: cleanComponents })
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Calculation failed');
-      }
-
-      setResult(data.data);
-    } catch (err) {
-      setError(err.message);
-    }
-  };
+  // --- Settings State ---
+  const [showSettings, setShowSettings] = useState(false);
+  const [settings, setSettings] = useState({
+    preFinalWeight: 70, // Default 70%
+    passingGrade: 60    // Default 60
+  });
 
   // --- Email Results ---
 
@@ -137,6 +109,54 @@ function App() {
     }
   };
 
+  // --- Calculation (Updated) ---
+  const calculate = async () => {
+    setError(null);
+    setResult(null);
+
+    // 1. Validate Weights
+    const totalWeight = components.reduce((sum, c) => sum + parseFloat(c.weight || 0), 0);
+    if (Math.abs(totalWeight - 100) > 0.1) {
+      setError(`Weights must sum to exactly 100%. Current total: ${totalWeight}%`);
+      return;
+    }
+
+    // 2. Scores Parsing
+    const cleanComponents = components.map(c => ({
+      name: c.name,
+      weight: parseFloat(c.weight),
+      scores: c.scores.map(s => {
+        const str = String(s).trim();
+        if (str.includes('/')) {
+          const parts = str.split('/');
+          if (parts.length === 2) {
+            const num = parseFloat(parts[0]);
+            const den = parseFloat(parts[1]);
+            if (!isNaN(num) && !isNaN(den) && den !== 0) return (num / den) * 100;
+          }
+        }
+        return parseFloat(str);
+      }).filter(n => !isNaN(n))
+    }));
+
+    try {
+      const response = await fetch(`${API_URL}/api/calculate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          components: cleanComponents,
+          settings // Pass Settings to Backend
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Calculation failed');
+      setResult(data.data);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   // --- Helper for Weight Color ---
   const totalWeight = components.reduce((sum, c) => sum + parseFloat(c.weight || 0), 0);
   const isWeightValid = Math.abs(totalWeight - 100) <= 0.1;
@@ -147,6 +167,50 @@ function App() {
       <Banner />
 
       <div className="w-full max-w-2xl bg-white rounded-lg shadow-md p-6 space-y-6">
+
+        {/* Settings Toggle */}
+        <div className="flex justify-end">
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="text-sm text-gray-500 hover:text-blue-600 underline"
+          >
+            {showSettings ? 'Hide Settings' : '⚙️ Custom Grading Settings'}
+          </button>
+        </div>
+
+        {/* Settings Panel */}
+        {showSettings && (
+          <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 animate-fade-in">
+            <h3 className="font-bold text-gray-700 mb-3 text-sm uppercase">Formula Settings</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Pre-Final Weight (%)</label>
+                <input
+                  type="number"
+                  value={settings.preFinalWeight}
+                  onChange={(e) => setSettings({ ...settings, preFinalWeight: parseFloat(e.target.value) })}
+                  className="w-full p-2 border rounded text-center font-bold text-blue-700"
+                />
+                <p className="text-xs text-gray-400 mt-1">Usually 70, 80, or 100</p>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Passing Grade</label>
+                <input
+                  type="number"
+                  value={settings.passingGrade}
+                  onChange={(e) => setSettings({ ...settings, passingGrade: parseFloat(e.target.value) })}
+                  className="w-full p-2 border rounded text-center font-bold text-green-700"
+                />
+                <p className="text-xs text-gray-400 mt-1">Usually 60 or 75</p>
+              </div>
+            </div>
+            {settings.preFinalWeight >= 100 && (
+              <div className="mt-2 text-xs text-orange-600 font-bold bg-orange-100 p-2 rounded">
+                ⚠️ At 100%, there is no Final Exam calculation. Your Pre-Final Grade IS your Final Grade.
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Components List */}
         {components.map((comp) => (
@@ -183,11 +247,11 @@ function App() {
               {comp.scores.map((score, idx) => (
                 <div key={idx} className="flex space-x-2">
                   <input
-                    type="number"
+                    type="text"
                     value={score}
                     onChange={(e) => handleScoreChange(comp.id, idx, e.target.value)}
                     className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border"
-                    placeholder={`Score ${idx + 1}`}
+                    placeholder={`Score (e.g. 90 or 18/20)`}
                   />
                   {comp.scores.length > 1 && (
                     <button
@@ -261,7 +325,7 @@ function App() {
               ) : (
                 <div className="text-yellow-600">
                   <p className="text-4xl font-extrabold">{result.requiredFinalExamScore}</p>
-                  <p className="text-sm font-medium">to reach passing grade (60)</p>
+                  <p className="text-sm font-medium">to reach passing grade ({settings.passingGrade})</p>
                 </div>
               )}
             </div>
